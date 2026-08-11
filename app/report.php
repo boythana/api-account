@@ -38,7 +38,8 @@ return function (App $app) {
             FROM transactions t 
             JOIN account_categories c ON t.category_id = c.id 
             WHERE 1=1
-            AND c.id NOT IN (42,319) ";
+            AND c.id NOT IN (42) ";
+            //AND c.id NOT IN (42,319) ";
 
             // 🎯 เงื่อนไขข้อที่ 1: ถ้ามีการส่ง date_from และ date_to มา ให้ใช้ date_from และ date_to ไม่ต้องสนใจปี
             if ($dateFrom && $dateTo) {
@@ -235,7 +236,8 @@ return function (App $app) {
                     LEFT JOIN master_common mc ON t.channel_id = mc.id AND mc.master_for = 'TRN_CHANNEL'
                     WHERE t.transaction_date >= :start_date 
                       AND t.transaction_date < :end_date
-                      AND c.id NOT IN (42 ,319) "; // 👈 เปลี่ยนจาก YEAR() มาใช้ Index Range แทน
+                      AND c.id NOT IN (42) ";
+                      //AND c.id NOT IN (42 ,319) "; 
 
             if ($churchId) {
                 $sql .= " AND t.church_id = :church_id";
@@ -279,7 +281,8 @@ return function (App $app) {
                     MONTH(t.transaction_date) AS month_num
                 FROM transactions t
                 LEFT JOIN account_categories ac ON t.category_id = ac.id
-                WHERE YEAR(t.transaction_date) = :year ";
+                WHERE YEAR(t.transaction_date) = :year
+                AND ac.id NOT IN (42) ";
 
             if ($churchId) {
                 $sql .= " AND t.church_id = :church_id ";
