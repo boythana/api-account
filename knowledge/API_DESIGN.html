@@ -1,0 +1,1839 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>API Design — Nexus Account</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #222638;
+      --border: #2e3248;
+      --text: #e2e4ef;
+      --muted: #7b80a0;
+      --accent: #6c8aff;
+      --get: #22c55e;
+      --post: #f59e0b;
+      --put: #3b82f6;
+      --delete: #ef4444;
+      --badge-jwt: #7c3aed;
+      --badge-pub: #0e7490;
+      --radius: 8px;
+      --mono: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    /* ── Layout ── */
+    .layout { display: flex; min-height: 100vh; }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 260px;
+      flex-shrink: 0;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      padding: 24px 0 40px;
+    }
+
+    .sidebar-logo {
+      padding: 0 20px 20px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 12px;
+    }
+    .sidebar-logo h1 { font-size: 15px; color: var(--text); font-weight: 700; }
+    .sidebar-logo p  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    .nav-group { margin-bottom: 4px; }
+    .nav-group-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      padding: 10px 20px 4px;
+    }
+    .nav-link {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 20px;
+      font-size: 13px;
+      color: var(--muted);
+      text-decoration: none;
+      border-radius: 0;
+      transition: background .15s, color .15s;
+      cursor: pointer;
+    }
+    .nav-link:hover { background: var(--surface2); color: var(--text); }
+    .nav-link.active { color: var(--accent); background: rgba(108,138,255,.08); border-left: 2px solid var(--accent); padding-left: 18px; }
+    .nav-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+    /* ── Main ── */
+    .main { flex: 1; min-width: 0; padding: 40px 48px 80px; max-width: 960px; }
+
+    .page-header { margin-bottom: 40px; padding-bottom: 24px; border-bottom: 1px solid var(--border); }
+    .page-header h1 { font-size: 26px; font-weight: 700; margin-bottom: 8px; }
+    .page-header p  { color: var(--muted); font-size: 14px; }
+
+    .meta-pills { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 10px; border-radius: 100px; font-size: 11px; font-weight: 600;
+      border: 1px solid;
+    }
+    .pill-blue  { background: rgba(59,130,246,.15); border-color: rgba(59,130,246,.3); color: #93c5fd; }
+    .pill-green { background: rgba(34,197,94,.12);  border-color: rgba(34,197,94,.3);  color: #86efac; }
+    .pill-purple{ background: rgba(124,58,237,.15); border-color: rgba(124,58,237,.3); color: #c4b5fd; }
+
+    /* ── Section ── */
+    .section { margin-bottom: 56px; scroll-margin-top: 24px; }
+    .section-header {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 20px; padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .section-icon {
+      width: 32px; height: 32px; border-radius: var(--radius);
+      display: grid; place-items: center; font-size: 15px; flex-shrink: 0;
+    }
+    .section-header h2 { font-size: 18px; font-weight: 700; }
+    .section-header .section-file { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+
+    /* ── Endpoint card ── */
+    .endpoint {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+    .endpoint-header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 16px; cursor: pointer;
+      user-select: none;
+      transition: background .15s;
+    }
+    .endpoint-header:hover { background: var(--surface2); }
+
+    .method {
+      font-family: var(--mono); font-size: 11px; font-weight: 700;
+      padding: 2px 8px; border-radius: 4px; flex-shrink: 0;
+      min-width: 54px; text-align: center;
+    }
+    .GET    { background: rgba(34,197,94,.15);  color: var(--get);    border: 1px solid rgba(34,197,94,.3); }
+    .POST   { background: rgba(245,158,11,.15); color: var(--post);   border: 1px solid rgba(245,158,11,.3); }
+    .PUT    { background: rgba(59,130,246,.15); color: var(--put);    border: 1px solid rgba(59,130,246,.3); }
+    .DELETE { background: rgba(239,68,68,.15);  color: var(--delete); border: 1px solid rgba(239,68,68,.3); }
+
+    .path { font-family: var(--mono); font-size: 13px; color: var(--text); flex: 1; min-width: 0; }
+    .path-param { color: var(--accent); }
+
+    .auth-badge {
+      font-size: 10px; font-weight: 700; letter-spacing: .05em;
+      padding: 2px 7px; border-radius: 4px; flex-shrink: 0;
+    }
+    .jwt { background: rgba(124,58,237,.2); color: #c4b5fd; border: 1px solid rgba(124,58,237,.3); }
+    .pub { background: rgba(14,116,144,.2);  color: #67e8f9;  border: 1px solid rgba(14,116,144,.3); }
+
+    .endpoint-desc { font-size: 13px; color: var(--muted); flex: none; max-width: 280px; text-align: right; }
+    .chevron { color: var(--muted); font-size: 11px; transition: transform .2s; flex-shrink: 0; margin-left: 4px; }
+    .endpoint.open .chevron { transform: rotate(90deg); }
+
+    .endpoint-body {
+      display: none;
+      border-top: 1px solid var(--border);
+      padding: 16px;
+      background: var(--bg);
+    }
+    .endpoint.open .endpoint-body { display: block; }
+
+    .body-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 700px) { .body-grid { grid-template-columns: 1fr; } }
+
+    .body-section h4 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 8px; }
+
+    /* ── Table ── */
+    .param-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .param-table th {
+      text-align: left; padding: 5px 8px;
+      background: var(--surface2); color: var(--muted);
+      font-weight: 600; border-bottom: 1px solid var(--border);
+      font-size: 11px;
+    }
+    .param-table td { padding: 5px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .param-table tr:last-child td { border-bottom: none; }
+    .param-name { font-family: var(--mono); color: #93c5fd; }
+    .param-required { color: #f87171; font-size: 10px; }
+    .param-optional { color: var(--muted); font-size: 10px; }
+    .param-type  { color: #fcd34d; font-family: var(--mono); font-size: 11px; }
+    .param-desc  { color: var(--muted); }
+
+    /* ── Code block ── */
+    pre {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+      overflow-x: auto;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.6;
+      color: #e2e4ef;
+    }
+    .json-key    { color: #93c5fd; }
+    .json-str    { color: #86efac; }
+    .json-num    { color: #fcd34d; }
+    .json-bool   { color: #f472b6; }
+    .json-null   { color: #f472b6; }
+    .json-comment{ color: #6b7280; font-style: italic; }
+
+    /* ── Response tags ── */
+    .res-tag {
+      display: inline-block; font-family: var(--mono);
+      font-size: 10px; font-weight: 700; padding: 1px 6px;
+      border-radius: 3px; margin-bottom: 6px;
+    }
+    .res-200 { background: rgba(34,197,94,.2);  color: #86efac; }
+    .res-201 { background: rgba(34,197,94,.2);  color: #86efac; }
+    .res-400 { background: rgba(245,158,11,.2); color: #fcd34d; }
+    .res-401 { background: rgba(239,68,68,.2);  color: #fca5a5; }
+    .res-404 { background: rgba(239,68,68,.2);  color: #fca5a5; }
+    .res-500 { background: rgba(239,68,68,.2);  color: #fca5a5; }
+    .res-file{ background: rgba(124,58,237,.2); color: #c4b5fd; }
+
+    /* ── Summary table ── */
+    .summary-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 32px; }
+    .summary-table th { text-align: left; padding: 8px 12px; background: var(--surface2); color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; border-bottom: 2px solid var(--border); }
+    .summary-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+    .summary-table tr:last-child td { border-bottom: none; }
+    .summary-table .mono { font-family: var(--mono); font-size: 12px; }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-logo">
+      <h1>Nexus Account API</h1>
+      <p>Slim 4 · PHP · PDO MySQL</p>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-group-label">Overview</div>
+      <a class="nav-link" href="#overview">
+        <span class="nav-dot" style="background:#6c8aff"></span>Overview
+      </a>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-group-label">Endpoints</div>
+      <a class="nav-link" href="#auth">
+        <span class="nav-dot" style="background:#f472b6"></span>Authentication
+      </a>
+      <a class="nav-link" href="#users">
+        <span class="nav-dot" style="background:#22c55e"></span>Users
+      </a>
+      <a class="nav-link" href="#master">
+        <span class="nav-dot" style="background:#3b82f6"></span>Master Data
+      </a>
+      <a class="nav-link" href="#transactions">
+        <span class="nav-dot" style="background:#f59e0b"></span>Transactions
+      </a>
+      <a class="nav-link" href="#reports">
+        <span class="nav-dot" style="background:#a78bfa"></span>Reports
+      </a>
+      <a class="nav-link" href="#closing">
+        <span class="nav-dot" style="background:#fb923c"></span>Monthly Closing
+      </a>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-group-label">Reference</div>
+      <a class="nav-link" href="#errors">
+        <span class="nav-dot" style="background:#ef4444"></span>Error Format
+      </a>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <main class="main">
+
+    <div class="page-header">
+      <h1>API Design Documentation</h1>
+      <p>สรุป API endpoints ทั้งหมด พร้อม method, path, request body และ response format</p>
+      <div class="meta-pills">
+        <span class="pill pill-blue">Slim 4 Framework</span>
+        <span class="pill pill-green">49 Endpoints</span>
+        <span class="pill pill-purple">JWT Auth (firebase/php-jwt)</span>
+      </div>
+    </div>
+
+    <!-- OVERVIEW -->
+    <section class="section" id="overview">
+      <div class="section-header">
+        <div class="section-icon" style="background:rgba(108,138,255,.15)">📋</div>
+        <div>
+          <h2>Overview</h2>
+          <div class="section-file">public/index.php</div>
+        </div>
+      </div>
+
+      <table class="summary-table">
+        <thead>
+          <tr><th>กลุ่ม</th><th>ไฟล์</th><th>จำนวน</th><th>Auth</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Authentication</td><td class="mono">app/auth.php</td><td>11</td><td><span class="auth-badge pub">PUBLIC</span> + <span class="auth-badge jwt">🔒 JWT</span></td></tr>
+          <tr><td>Users</td><td class="mono">app/users.php</td><td>7</td><td><span class="auth-badge pub">PUBLIC</span></td></tr>
+          <tr><td>Master Data</td><td class="mono">app/master.php</td><td>8</td><td><span class="auth-badge jwt">🔒 JWT</span></td></tr>
+          <tr><td>Transactions</td><td class="mono">app/transactions.php</td><td>7</td><td><span class="auth-badge jwt">🔒 JWT</span></td></tr>
+          <tr><td>Reports</td><td class="mono">app/report.php</td><td>16</td><td><span class="auth-badge jwt">🔒 JWT</span></td></tr>
+        </tbody>
+      </table>
+
+      <p style="color:var(--muted);font-size:13px;">
+        🔒 Endpoints ที่ต้องการ JWT ให้แนบ header: <code style="font-family:var(--mono);color:#93c5fd">Authorization: Bearer &lt;token&gt;</code>
+      </p>
+    </section>
+
+    <!-- AUTH -->
+    <section class="section" id="auth">
+      <div class="section-header">
+        <div class="section-icon" style="background:rgba(244,114,182,.15)">🔑</div>
+        <div>
+          <h2>Authentication</h2>
+          <div class="section-file">app/auth.php</div>
+        </div>
+      </div>
+
+      <!-- POST /api/login -->
+      <div class="endpoint" id="ep-login">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method POST">POST</span>
+          <span class="path">/api/login</span>
+          <span class="auth-badge pub">PUBLIC</span>
+          <span class="endpoint-desc">เข้าสู่ระบบ รับ JWT Token</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-grid">
+            <div class="body-section">
+              <h4>Request Body</h4>
+              <table class="param-table">
+                <thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                  <tr><td class="param-name">email</td><td class="param-type">string</td><td class="param-required">✅</td><td class="param-desc">อีเมลผู้ใช้งาน</td></tr>
+                  <tr><td class="param-name">password</td><td class="param-type">string</td><td class="param-required">✅</td><td class="param-desc">รหัสผ่าน</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="body-section">
+              <h4>Response</h4>
+              <span class="res-tag res-200">200 OK</span>
+              <pre><span class="json-key">"status"</span>: <span class="json-str">"success"</span>,
+<span class="json-key">"message"</span>: <span class="json-str">"เข้าสู่ระบบสำเร็จ"</span>,
+<span class="json-key">"user"</span>: {
+  <span class="json-key">"id"</span>: <span class="json-num">1</span>, <span class="json-key">"firstname"</span>: <span class="json-str">"..."</span>,
+  <span class="json-key">"lastname"</span>: <span class="json-str">"..."</span>, <span class="json-key">"email"</span>: <span class="json-str">"..."</span>
+},
+<span class="json-key">"token"</span>: <span class="json-str">"&lt;jwt&gt;"</span></pre>
+              <span class="res-tag res-401">401</span>
+              <pre><span class="json-key">"status"</span>: <span class="json-str">"error"</span>,
+<span class="json-key">"message"</span>: <span class="json-str">"อีเมลหรือรหัสผ่านไม่ถูกต้อง"</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- POST /api/forgot-password -->
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method POST">POST</span>
+          <span class="path">/api/forgot-password</span>
+          <span class="auth-badge pub">PUBLIC</span>
+          <span class="endpoint-desc">ขอลิงก์รีเซ็ตรหัสผ่าน</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-grid">
+            <div class="body-section">
+              <h4>Request Body</h4>
+              <table class="param-table">
+                <thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                  <tr><td class="param-name">email</td><td class="param-type">string</td><td class="param-required">✅</td><td class="param-desc">อีเมลที่ลงทะเบียนไว้</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="body-section">
+              <h4>Response</h4>
+              <span class="res-tag res-200">200 OK</span>
+              <pre><span class="json-key">"status"</span>: <span class="json-str">"success"</span>,
+<span class="json-key">"message"</span>: <span class="json-str">"ระบบได้ส่งลิงก์..."</span>,
+<span class="json-key">"debug_url"</span>: <span class="json-str">"https://..."</span></pre>
+              <span class="res-tag res-404">404</span>
+              <pre><span class="json-key">"status"</span>: <span class="json-str">"error"</span>,
+<span class="json-key">"message"</span>: <span class="json-str">"ไม่พบอีเมลนี้ในระบบ"</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GET /api/verify-reset-token -->
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/verify-reset-token</span>
+          <span class="auth-badge pub">PUBLIC</span>
+          <span class="endpoint-desc">ตรวจสอบ Token รีเซ็ต</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-grid">
+            <div class="body-section">
+              <h4>Query Parameters</h4>
+              <table class="param-table">
+                <thead><tr><th>Param</th><th>Type</th><th>Required</th></tr></thead>
+                <tbody>
+                  <tr><td class="param-name">token</td><td class="param-type">string</td><td class="param-required">✅</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="body-section">
+              <h4>Response</h4>
+              <span class="res-tag res-200">200 OK</span>
+              <pre><span class="json-key">"status"</span>: <span class="json-str">"success"</span>,
+<span class="json-key">"message"</span>: <span class="json-str">"Token ถูกต้อง"</span>,
+<span class="json-key">"user_id"</span>: <span class="json-num">1</span></pre>
+              <span class="res-tag res-400">400</span>
+              <pre><span class="json-key">"status"</span>: <span class="json-str">"error"</span>,
+<span class="json-key">"message"</span>: <span class="json-str">"Token ไม่ถูกต้องหรือหมดอายุ"</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- POST /api/reset-password -->
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method POST">POST</span>
+          <span class="path">/api/reset-password</span>
+          <span class="auth-badge pub">PUBLIC</span>
+          <span class="endpoint-desc">บันทึกรหัสผ่านใหม่</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-grid">
+            <div class="body-section">
+              <h4>Request Body</h4>
+              <table class="param-table">
+                <thead><tr><th>Field</th><th>Type</th><th>Required</th></tr></thead>
+                <tbody>
+                  <tr><td class="param-name">token</td><td class="param-type">string</td><td class="param-required">✅</td></tr>
+                  <tr><td class="param-name">new_password</td><td class="param-type">string</td><td class="param-required">✅</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="body-section">
+              <h4>Response</h4>
+              <span class="res-tag res-200">200 OK</span>
+              <pre><span class="json-key">"status"</span>: <span class="json-str">"success"</span>,
+<span class="json-key">"message"</span>: <span class="json-str">"เปลี่ยนรหัสผ่านสำเร็จ..."</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GET /api/approve-permission -->
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/approve-permission</span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">ดึงสิทธิ์อนุมัติของโบสถ์</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-grid">
+            <div class="body-section">
+              <h4>Query Parameters</h4>
+              <table class="param-table">
+                <thead><tr><th>Param</th><th>Type</th><th>Required</th></tr></thead>
+                <tbody>
+                  <tr><td class="param-name">church_id</td><td class="param-type">int</td><td class="param-required">✅</td></tr>
+                  <tr><td class="param-name">request_form_id</td><td class="param-type">int</td><td class="param-required">✅</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="body-section">
+              <h4>Response</h4>
+              <span class="res-tag res-200">200 OK</span>
+              <pre>[{ <span class="json-key">"user_id"</span>: <span class="json-num">1</span>, <span class="json-key">"approve_level"</span>: <span class="json-num">2</span> }]</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GET /api/user-roles/:id -->
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/user-roles/<span class="path-param">{userId}</span></span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">ดึง Role ของผู้ใช้</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-grid">
+            <div class="body-section">
+              <h4>Path Parameters</h4>
+              <table class="param-table">
+                <thead><tr><th>Param</th><th>Type</th></tr></thead>
+                <tbody><tr><td class="param-name">userId</td><td class="param-type">int</td></tr></tbody>
+              </table>
+            </div>
+            <div class="body-section">
+              <h4>Response</h4>
+              <span class="res-tag res-200">200 OK</span>
+              <pre>[{ <span class="json-key">"role_id"</span>: <span class="json-num">2</span>, <span class="json-key">"role_name"</span>: <span class="json-str">"Manager"</span> }]</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GET /api/permission-data-master/:id -->
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/permission-data-master/<span class="path-param">{userId}</span></span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">สิทธิ์ข้อมูลหลัก</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-section">
+            <h4>Response</h4>
+            <span class="res-tag res-200">200 OK</span>
+            <pre>[{ <span class="json-key">"scope_type"</span>: <span class="json-str">"church"</span>, <span class="json-key">"scope_id"</span>: <span class="json-num">3</span>, <span class="json-key">"permission"</span>: <span class="json-str">"write"</span> }]</pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- GET /api/permission-data/:id -->
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/permission-data/<span class="path-param">{userId}</span></span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">โบสถ์ที่ผู้ใช้มีสิทธิ์</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-section">
+            <h4>Response</h4>
+            <span class="res-tag res-200">200 OK</span>
+            <pre>[{ <span class="json-key">"church_id"</span>: <span class="json-num">1</span>, <span class="json-key">"church_name"</span>: <span class="json-str">"โบสถ์ A"</span>, <span class="json-key">"permission"</span>: <span class="json-str">"write"</span> }]</pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- GET /api/permission-menu/:id -->
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/permission-menu/<span class="path-param">{userId}</span></span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">เมนูสำหรับ Sidebar</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-section">
+            <h4>Response</h4>
+            <span class="res-tag res-200">200 OK</span>
+            <pre>[{
+  <span class="json-key">"menu_id"</span>: <span class="json-num">1</span>, <span class="json-key">"menu_label"</span>: <span class="json-str">"รายงาน"</span>,
+  <span class="json-key">"menu_key"</span>: <span class="json-str">"report"</span>, <span class="json-key">"sort_order"</span>: <span class="json-num">1</span>,
+  <span class="json-key">"permission"</span>: <span class="json-str">"read"</span>
+}]</pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- PUT /api/user-permissions/:id -->
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method PUT">PUT</span>
+          <span class="path">/api/user-permissions/<span class="path-param">{userId}</span></span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">อัปเดตสิทธิ์ข้อมูล</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-grid">
+            <div class="body-section">
+              <h4>Request Body</h4>
+              <pre>{
+  <span class="json-key">"permissions"</span>: [
+    {
+      <span class="json-key">"scope_type"</span>: <span class="json-str">"church"</span>,
+      <span class="json-key">"scope_id"</span>: <span class="json-num">1</span>,
+      <span class="json-key">"permission"</span>: <span class="json-str">"write"</span>
+    }
+  ]
+}</pre>
+            </div>
+            <div class="body-section">
+              <h4>Response</h4>
+              <span class="res-tag res-200">200 OK</span>
+              <pre>{ <span class="json-key">"status"</span>: <span class="json-str">"success"</span>, <span class="json-key">"message"</span>: <span class="json-str">"บันทึกสิทธิ์เรียบร้อยแล้ว"</span> }</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PUT /api/user-roles/:id -->
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method PUT">PUT</span>
+          <span class="path">/api/user-roles/<span class="path-param">{userId}</span></span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">อัปเดต Role ผู้ใช้</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-grid">
+            <div class="body-section">
+              <h4>Request Body</h4>
+              <pre>{ <span class="json-key">"role_ids"</span>: [<span class="json-num">2</span>, <span class="json-num">3</span>] }</pre>
+            </div>
+            <div class="body-section">
+              <h4>Response</h4>
+              <span class="res-tag res-200">200 OK</span>
+              <pre>{ <span class="json-key">"status"</span>: <span class="json-str">"success"</span>, <span class="json-key">"message"</span>: <span class="json-str">"บันทึก Role เรียบร้อยแล้ว"</span> }</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- USERS -->
+    <section class="section" id="users">
+      <div class="section-header">
+        <div class="section-icon" style="background:rgba(34,197,94,.15)">👤</div>
+        <div>
+          <h2>Users</h2>
+          <div class="section-file">app/users.php</div>
+        </div>
+      </div>
+
+      <!-- GET /api/users -->
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/users</span>
+          <span class="auth-badge pub">PUBLIC</span>
+          <span class="endpoint-desc">ดึงผู้ใช้ทั้งหมด</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-section">
+            <h4>Response</h4>
+            <span class="res-tag res-200">200 OK</span>
+            <pre>[{ <span class="json-key">"id"</span>: <span class="json-num">1</span>, <span class="json-key">"firstname"</span>: <span class="json-str">"สมชาย"</span>, <span class="json-key">"lastname"</span>: <span class="json-str">"ใจดี"</span>, <span class="json-key">"email"</span>: <span class="json-str">"..."</span>, <span class="json-key">"phone"</span>: <span class="json-str">"..."</span> }]</pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- GET /api/user/staffs -->
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/user/staffs</span>
+          <span class="auth-badge pub">PUBLIC</span>
+          <span class="endpoint-desc">รายชื่อพนักงานทั้งหมด</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-section">
+            <h4>Response</h4>
+            <span class="res-tag res-200">200 OK</span>
+            <pre>[{ <span class="json-key">"id"</span>: <span class="json-num">1</span>, <span class="json-key">"firstname"</span>: <span class="json-str">"สมชาย"</span>, <span class="json-key">"lastname"</span>: <span class="json-str">"ใจดี"</span> }]</pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- GET /api/user/person-wallet-list -->
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/user/person-wallet-list</span>
+          <span class="auth-badge pub">PUBLIC</span>
+          <span class="endpoint-desc">ผู้ใช้ที่ผูก Wallet กับโบสถ์</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-grid">
+            <div class="body-section">
+              <h4>Query Parameters</h4>
+              <table class="param-table">
+                <thead><tr><th>Param</th><th>Type</th><th>Required</th></tr></thead>
+                <tbody><tr><td class="param-name">church_id</td><td class="param-type">int</td><td class="param-required">✅</td></tr></tbody>
+              </table>
+            </div>
+            <div class="body-section">
+              <h4>Response</h4>
+              <span class="res-tag res-200">200 OK</span>
+              <pre>[{ <span class="json-key">"value"</span>: <span class="json-num">5</span>, <span class="json-key">"label"</span>: <span class="json-str">"สมชาย ใจดี"</span> }]</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GET /api/users/search -->
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/users/search</span>
+          <span class="auth-badge pub">PUBLIC</span>
+          <span class="endpoint-desc">ค้นหาผู้ใช้ (Paginated)</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-grid">
+            <div class="body-section">
+              <h4>Query Parameters</h4>
+              <table class="param-table">
+                <thead><tr><th>Param</th><th>Default</th><th>Description</th></tr></thead>
+                <tbody>
+                  <tr><td class="param-name">search</td><td class="param-optional">""</td><td class="param-desc">ค้นจาก firstname หรือ email</td></tr>
+                  <tr><td class="param-name">page</td><td class="param-optional">1</td><td class="param-desc">หน้าที่ต้องการ</td></tr>
+                  <tr><td class="param-name">limit</td><td class="param-optional">20</td><td class="param-desc">จำนวนต่อหน้า</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="body-section">
+              <h4>Response</h4>
+              <span class="res-tag res-200">200 OK</span>
+              <pre>{
+  <span class="json-key">"data"</span>: [{<span class="json-key">"id"</span>:<span class="json-num">1</span>, <span class="json-key">"firstname"</span>:<span class="json-str">"..."</span>}],
+  <span class="json-key">"total_count"</span>: <span class="json-num">50</span>,
+  <span class="json-key">"total_pages"</span>: <span class="json-num">3</span>,
+  <span class="json-key">"current_page"</span>: <span class="json-num">1</span>
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GET /api/users/:id -->
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/users/<span class="path-param">{id}</span></span>
+          <span class="auth-badge pub">PUBLIC</span>
+          <span class="endpoint-desc">ดึงข้อมูลผู้ใช้รายคน</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-section">
+            <h4>Response</h4>
+            <span class="res-tag res-200">200 OK</span>
+            <pre>{ <span class="json-key">"id"</span>: <span class="json-num">1</span>, <span class="json-key">"firstname"</span>: <span class="json-str">"..."</span>, <span class="json-comment">/* ทุก field ในตาราง users */</span> }</pre>
+            <span class="res-tag res-404">404</span>
+            <pre>{ <span class="json-key">"error"</span>: <span class="json-str">"ไม่พบข้อมูลรายการนี้"</span> }</pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- POST /api/users -->
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method POST">POST</span>
+          <span class="path">/api/users</span>
+          <span class="auth-badge pub">PUBLIC</span>
+          <span class="endpoint-desc">สร้างผู้ใช้งานใหม่</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-grid">
+            <div class="body-section">
+              <h4>Request Body</h4>
+              <table class="param-table">
+                <thead><tr><th>Field</th><th>Type</th><th>Required</th></tr></thead>
+                <tbody>
+                  <tr><td class="param-name">firstname</td><td class="param-type">string</td><td class="param-required">✅</td></tr>
+                  <tr><td class="param-name">lastname</td><td class="param-type">string</td><td class="param-required">✅</td></tr>
+                  <tr><td class="param-name">email</td><td class="param-type">string</td><td class="param-required">✅</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="body-section">
+              <h4>Response</h4>
+              <span class="res-tag res-201">201 Created</span>
+              <pre>{ <span class="json-key">"status"</span>: <span class="json-str">"success"</span>, <span class="json-key">"message"</span>: <span class="json-str">"สร้างผู้ใช้งานเรียบร้อย..."</span> }</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PUT /api/users/:id -->
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method PUT">PUT</span>
+          <span class="path">/api/users/<span class="path-param">{id}</span></span>
+          <span class="auth-badge pub">PUBLIC</span>
+          <span class="endpoint-desc">แก้ไขข้อมูลผู้ใช้</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-grid">
+            <div class="body-section">
+              <h4>Request Body (ทุก field optional)</h4>
+              <table class="param-table">
+                <thead><tr><th>Field</th><th>Type</th><th>Required</th></tr></thead>
+                <tbody>
+                  <tr><td class="param-name">firstname</td><td class="param-type">string</td><td class="param-optional">—</td></tr>
+                  <tr><td class="param-name">lastname</td><td class="param-type">string</td><td class="param-optional">—</td></tr>
+                  <tr><td class="param-name">email</td><td class="param-type">string</td><td class="param-optional">—</td></tr>
+                  <tr><td class="param-name">phone</td><td class="param-type">string</td><td class="param-optional">—</td></tr>
+                  <tr><td class="param-name">password</td><td class="param-type">string</td><td class="param-optional">—</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="body-section">
+              <h4>Response</h4>
+              <span class="res-tag res-200">200 OK</span>
+              <pre>{ <span class="json-key">"status"</span>: <span class="json-str">"success"</span>, <span class="json-key">"message"</span>: <span class="json-str">"User updated successfully"</span> }</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MASTER DATA -->
+    <section class="section" id="master">
+      <div class="section-header">
+        <div class="section-icon" style="background:rgba(59,130,246,.15)">🗂️</div>
+        <div>
+          <h2>Master Data</h2>
+          <div class="section-file">app/master.php — 🔒 JWT Required</div>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/master/churches</span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">รายชื่อโบสถ์ทั้งหมด</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-section">
+            <h4>Response</h4>
+            <span class="res-tag res-200">200 OK</span>
+            <pre>[{ <span class="json-key">"value"</span>: <span class="json-num">1</span>, <span class="json-key">"label"</span>: <span class="json-str">"โบสถ์ A"</span>, <span class="json-key">"region_id"</span>: <span class="json-num">2</span>, <span class="json-key">"region_name"</span>: <span class="json-str">"ภาคเหนือ"</span> }]</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/master/categories</span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">หมวดหมู่บัญชี</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <p style="color:var(--muted);font-size:12px;margin-bottom:8px">Role 3 (Staff) เห็นเฉพาะประเภท expense</p>
+          <div class="body-section">
+            <h4>Response</h4>
+            <span class="res-tag res-200">200 OK</span>
+            <pre>[{ <span class="json-key">"value"</span>: <span class="json-num">10</span>, <span class="json-key">"label"</span>: <span class="json-str">"ค่าใช้จ่ายทั่วไป"</span> }]</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/master/roles</span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">Role ทั้งหมดในระบบ</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-section">
+            <h4>Response</h4>
+            <span class="res-tag res-200">200 OK</span>
+            <pre>[{ <span class="json-key">"role_id"</span>: <span class="json-num">1</span>, <span class="json-key">"role_name"</span>: <span class="json-str">"Admin"</span> }]</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/master/missions</span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">รายการพันธกิจ</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-section">
+            <span class="res-tag res-200">200 OK</span>
+            <pre>[{ <span class="json-key">"value"</span>: <span class="json-num">1</span>, <span class="json-key">"label"</span>: <span class="json-str">"พันธกิจเด็ก"</span> }]</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/master/departments</span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">รายการฝ่าย/หน่วยงาน</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-section">
+            <span class="res-tag res-200">200 OK</span>
+            <pre>[{ <span class="json-key">"value"</span>: <span class="json-num">1</span>, <span class="json-key">"label"</span>: <span class="json-str">"ฝ่ายการเงิน"</span> }]</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/master/categories/type</span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">หมวดหมู่แยกตามประเภท</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-grid">
+            <div class="body-section">
+              <h4>Query Parameters</h4>
+              <table class="param-table">
+                <thead><tr><th>Param</th><th>Type</th><th>Description</th></tr></thead>
+                <tbody><tr><td class="param-name">type</td><td class="param-type">string</td><td class="param-desc">income หรือ expense</td></tr></tbody>
+              </table>
+            </div>
+            <div class="body-section">
+              <h4>Response</h4>
+              <span class="res-tag res-200">200 OK</span>
+              <pre>[{
+  <span class="json-key">"category_id"</span>: <span class="json-num">1</span>,
+  <span class="json-key">"category_name"</span>: <span class="json-str">"รายรับทั่วไป"</span>,
+  <span class="json-key">"category_group"</span>: <span class="json-str">"กลุ่มรายรับ"</span>
+}]</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/master/common</span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">Common Master ลิสต์กลาง</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-grid">
+            <div class="body-section">
+              <h4>Query Parameters</h4>
+              <table class="param-table">
+                <thead><tr><th>Param</th><th>Example</th></tr></thead>
+                <tbody><tr><td class="param-name">masterFor</td><td class="param-desc">TRN_CHANNEL</td></tr></tbody>
+              </table>
+            </div>
+            <div class="body-section">
+              <h4>Response</h4>
+              <span class="res-tag res-200">200 OK</span>
+              <pre>[{ <span class="json-key">"value"</span>: <span class="json-num">1</span>, <span class="json-key">"label"</span>: <span class="json-str">"โอนธนาคาร"</span> }]</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/master-bank-account/<span class="path-param">{churchId}</span></span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">บัญชีธนาคารของโบสถ์</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-section">
+            <span class="res-tag res-200">200 OK</span>
+            <pre>[{
+  <span class="json-key">"bank_account"</span>: <span class="json-str">"123-4-56789-0"</span>,
+  <span class="json-key">"bank_account_name"</span>: <span class="json-str">"(123-4-56789-0) บัญชีออมทรัพย์"</span>,
+  <span class="json-key">"bank_name"</span>: <span class="json-str">"SCB"</span>
+}]</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TRANSACTIONS -->
+    <section class="section" id="transactions">
+      <div class="section-header">
+        <div class="section-icon" style="background:rgba(245,158,11,.15)">💳</div>
+        <div>
+          <h2>Transactions</h2>
+          <div class="section-file">app/transactions.php — 🔒 JWT Required</div>
+        </div>
+      </div>
+
+      <!-- POST /api/transactions -->
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method POST">POST</span>
+          <span class="path">/api/transactions</span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">บันทึกธุรกรรมใหม่</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <p style="color:var(--muted);font-size:12px;margin-bottom:12px">Content-Type: <code style="font-family:var(--mono);color:#93c5fd">multipart/form-data</code></p>
+          <div class="body-grid">
+            <div class="body-section">
+              <h4>Request Body</h4>
+              <table class="param-table">
+                <thead><tr><th>Field</th><th>Type</th><th>Required</th></tr></thead>
+                <tbody>
+                  <tr><td class="param-name">church_id</td><td class="param-type">int</td><td class="param-required">✅</td></tr>
+                  <tr><td class="param-name">category_id</td><td class="param-type">int</td><td class="param-required">✅</td></tr>
+                  <tr><td class="param-name">channel_id</td><td class="param-type">int</td><td class="param-required">✅</td></tr>
+                  <tr><td class="param-name">amount</td><td class="param-type">decimal</td><td class="param-required">✅</td></tr>
+                  <tr><td class="param-name">transaction_date</td><td class="param-type">date</td><td class="param-required">✅</td></tr>
+                  <tr><td class="param-name">recorded_by</td><td class="param-type">int</td><td class="param-required">✅</td></tr>
+                  <tr><td class="param-name">bank_account</td><td class="param-type">string</td><td class="param-optional">—</td></tr>
+                  <tr><td class="param-name">person_wallet</td><td class="param-type">int</td><td class="param-optional">—</td></tr>
+                  <tr><td class="param-name">ref_no</td><td class="param-type">string</td><td class="param-optional">—</td></tr>
+                  <tr><td class="param-name">payee_payer</td><td class="param-type">string</td><td class="param-optional">—</td></tr>
+                  <tr><td class="param-name">description</td><td class="param-type">string</td><td class="param-optional">—</td></tr>
+                  <tr><td class="param-name">mission_id</td><td class="param-type">int</td><td class="param-optional">—</td></tr>
+                  <tr><td class="param-name">department_id</td><td class="param-type">int</td><td class="param-optional">—</td></tr>
+                  <tr><td class="param-name">files[]</td><td class="param-type">file</td><td class="param-optional">—</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="body-section">
+              <h4>Response</h4>
+              <span class="res-tag res-201">201 Created</span>
+              <pre>{
+  <span class="json-key">"status"</span>: <span class="json-str">"success"</span>,
+  <span class="json-key">"message"</span>: <span class="json-str">"Transaction and files recorded"</span>,
+  <span class="json-key">"id"</span>: <span class="json-num">99</span>,
+  <span class="json-key">"files"</span>: [<span class="json-str">"2601/1/ch1_..."</span>]
+}</pre>
+              <span class="res-tag res-400">400</span>
+              <pre><span class="json-comment">// ถ้าเดือนนั้นปิดงบแล้ว</span>
+{ <span class="json-key">"status"</span>: <span class="json-str">"error"</span>, <span class="json-key">"message"</span>: <span class="json-str">"..."</span> }</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- POST /api/transaction/:id/update -->
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method POST">POST</span>
+          <span class="path">/api/transaction/<span class="path-param">{id}</span>/update</span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">อัปเดตธุรกรรม</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <p style="color:var(--muted);font-size:12px;margin-bottom:12px">Content-Type: <code style="font-family:var(--mono);color:#93c5fd">multipart/form-data</code> — ส่งเฉพาะ field ที่ต้องการแก้ไข</p>
+          <div class="body-grid">
+            <div class="body-section">
+              <h4>Allowed Fields</h4>
+              <pre>category_id, amount, channel_id,
+bank_account, person_wallet, ref_no,
+payee_payer, transaction_date,
+description, recorded_by,
+mission_id, department_id,
+delete_files, files[]</pre>
+              <p style="color:var(--muted);font-size:11px;margin-top:8px"><code style="font-family:var(--mono)">delete_files</code> = JSON array ของ attachment ID ที่ลบ</p>
+            </div>
+            <div class="body-section">
+              <h4>Response</h4>
+              <span class="res-tag res-200">200 OK</span>
+              <pre>{ <span class="json-key">"status"</span>: <span class="json-str">"success"</span>, <span class="json-key">"message"</span>: <span class="json-str">"Transaction updated successfully"</span> }</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DELETE /api/transaction/:id -->
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method DELETE">DELETE</span>
+          <span class="path">/api/transaction/<span class="path-param">{id}</span></span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">ลบธุรกรรม</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-section">
+            <h4>Response</h4>
+            <span class="res-tag res-200">200 OK</span>
+            <pre>{ <span class="json-key">"status"</span>: <span class="json-str">"success"</span>, <span class="json-key">"message"</span>: <span class="json-str">"Transaction deleted"</span> }</pre>
+            <span class="res-tag res-404">404</span>
+            <pre>{ <span class="json-key">"status"</span>: <span class="json-str">"error"</span>, <span class="json-key">"message"</span>: <span class="json-str">"Transaction not found"</span> }</pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- GET /api/transaction/:id -->
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/transaction/<span class="path-param">{id}</span></span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">ดึงธุรกรรมรายการเดียว</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-section">
+            <h4>Response</h4>
+            <span class="res-tag res-200">200 OK</span>
+            <pre>{
+  <span class="json-key">"id"</span>: <span class="json-num">1</span>, <span class="json-key">"church_id"</span>: <span class="json-num">1</span>, <span class="json-key">"category_id"</span>: <span class="json-num">5</span>,
+  <span class="json-key">"amount"</span>: <span class="json-str">"1000.00"</span>, <span class="json-key">"transaction_date"</span>: <span class="json-str">"2026-01-15"</span>, <span class="json-comment">/* ... */</span>
+  <span class="json-key">"attachments"</span>: [{
+    <span class="json-key">"id"</span>: <span class="json-num">1</span>, <span class="json-key">"file_name"</span>: <span class="json-str">"slip.pdf"</span>, <span class="json-key">"file_path"</span>: <span class="json-str">"2601/1/ch1_..."</span>
+  }]
+}</pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- GET /api/transactions/search -->
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/transactions/search</span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">ค้นหาธุรกรรม (Paginated)</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-grid">
+            <div class="body-section">
+              <h4>Query Parameters</h4>
+              <table class="param-table">
+                <thead><tr><th>Param</th><th>Type</th><th>Description</th></tr></thead>
+                <tbody>
+                  <tr><td class="param-name">church_id</td><td class="param-type">int</td><td class="param-desc">กรองตามโบสถ์</td></tr>
+                  <tr><td class="param-name">category_id</td><td class="param-type">int</td><td class="param-desc">กรองหมวดหมู่</td></tr>
+                  <tr><td class="param-name">bank_account</td><td class="param-type">string</td><td class="param-desc">กรองบัญชีธนาคาร</td></tr>
+                  <tr><td class="param-name">start_date</td><td class="param-type">date</td><td class="param-desc">วันเริ่มต้น</td></tr>
+                  <tr><td class="param-name">end_date</td><td class="param-type">date</td><td class="param-desc">วันสิ้นสุด</td></tr>
+                  <tr><td class="param-name">ref_no</td><td class="param-type">string</td><td class="param-desc">LIKE search</td></tr>
+                  <tr><td class="param-name">payee_payer</td><td class="param-type">string</td><td class="param-desc">LIKE search</td></tr>
+                  <tr><td class="param-name">description</td><td class="param-type">string</td><td class="param-desc">LIKE search</td></tr>
+                  <tr><td class="param-name">page</td><td class="param-type">int</td><td class="param-desc">default: 1</td></tr>
+                  <tr><td class="param-name">per_page</td><td class="param-type">int</td><td class="param-desc">default: 100</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="body-section">
+              <h4>Response</h4>
+              <span class="res-tag res-200">200 OK</span>
+              <pre>{
+  <span class="json-key">"status"</span>: <span class="json-str">"success"</span>,
+  <span class="json-key">"data"</span>: [{
+    <span class="json-key">"id"</span>: <span class="json-num">1</span>, <span class="json-key">"transaction_date"</span>: <span class="json-str">"15-01-2026"</span>,
+    <span class="json-key">"amount"</span>: <span class="json-str">"1000.00"</span>,
+    <span class="json-key">"church_name"</span>: <span class="json-str">"..."</span>,
+    <span class="json-key">"category_name"</span>: <span class="json-str">"..."</span>
+  }],
+  <span class="json-key">"pagination"</span>: {
+    <span class="json-key">"total"</span>: <span class="json-num">200</span>, <span class="json-key">"per_page"</span>: <span class="json-num">100</span>,
+    <span class="json-key">"current_page"</span>: <span class="json-num">1</span>, <span class="json-key">"last_page"</span>: <span class="json-num">2</span>
+  }
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- POST /api/transaction/upload-preview -->
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method POST">POST</span>
+          <span class="path">/api/transaction/upload-preview</span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">Preview ก่อน Import Excel</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-grid">
+            <div class="body-section">
+              <h4>Request Body (multipart/form-data)</h4>
+              <table class="param-table">
+                <thead><tr><th>Field</th><th>Type</th><th>Required</th></tr></thead>
+                <tbody><tr><td class="param-name">file</td><td class="param-type">file (.xlsx)</td><td class="param-required">✅</td></tr></tbody>
+              </table>
+              <p style="color:var(--muted);font-size:11px;margin-top:8px">คอลัมน์ที่รองรับ: Transaction ID, วันที่, หมวดหมู่, รายละเอียด, จำนวนเงิน, ช่องทาง, บัญชีธนาคาร, ผู้รับ, เลขที่อ้างอิง, กระเป๋าเงิน, mission, department</p>
+            </div>
+            <div class="body-section">
+              <h4>Response</h4>
+              <span class="res-tag res-200">200 OK</span>
+              <pre>{
+  <span class="json-key">"success"</span>: <span class="json-bool">true</span>,
+  <span class="json-key">"summary"</span>: {
+    <span class="json-key">"total_rows"</span>: <span class="json-num">10</span>,
+    <span class="json-key">"error_rows"</span>: <span class="json-num">1</span>,
+    <span class="json-key">"total_value"</span>: <span class="json-num">9500.00</span>
+  },
+  <span class="json-key">"data"</span>: [{
+    <span class="json-key">"row_index"</span>: <span class="json-num">2</span>, <span class="json-key">"cat_name"</span>: <span class="json-str">"..."</span>,
+    <span class="json-key">"value"</span>: <span class="json-num">1000</span>, <span class="json-key">"is_error"</span>: <span class="json-bool">false</span>,
+    <span class="json-key">"error_reason"</span>: <span class="json-str">""</span>
+  }]
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- POST /api/transaction/upload-confirm -->
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method POST">POST</span>
+          <span class="path">/api/transaction/upload-confirm</span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">Confirm Bulk Import</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-grid">
+            <div class="body-section">
+              <h4>Request Body (application/json)</h4>
+              <pre>{
+  <span class="json-key">"church_id"</span>: <span class="json-num">1</span>,
+  <span class="json-key">"items"</span>: [{
+    <span class="json-key">"cat_id"</span>: <span class="json-num">5</span>, <span class="json-key">"channel_id"</span>: <span class="json-num">2</span>,
+    <span class="json-key">"value"</span>: <span class="json-num">1000</span>,
+    <span class="json-key">"transaction_date"</span>: <span class="json-str">"2026-01-15"</span>,
+    <span class="json-key">"is_error"</span>: <span class="json-bool">false</span>
+  }]
+}</pre>
+            </div>
+            <div class="body-section">
+              <h4>Response</h4>
+              <span class="res-tag res-200">200 OK</span>
+              <pre>{
+  <span class="json-key">"success"</span>: <span class="json-bool">true</span>,
+  <span class="json-key">"message"</span>: <span class="json-str">"นำเข้าข้อมูล 9 รายการ..."</span>
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- REPORTS -->
+    <section class="section" id="reports">
+      <div class="section-header">
+        <div class="section-icon" style="background:rgba(167,139,250,.15)">📊</div>
+        <div>
+          <h2>Reports</h2>
+          <div class="section-file">app/report.php — 🔒 JWT Required</div>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/report/category</span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">รายงานแยกหมวดหมู่ (Pie Chart)</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-grid">
+            <div class="body-section">
+              <h4>Query Parameters</h4>
+              <table class="param-table">
+                <thead><tr><th>Param</th><th>Default</th><th>Description</th></tr></thead>
+                <tbody>
+                  <tr><td class="param-name">church_id</td><td>—</td><td class="param-desc">0 = คืนผลว่าง</td></tr>
+                  <tr><td class="param-name">date_from</td><td>—</td><td class="param-desc">ถ้าส่งคู่นี้จะ override year</td></tr>
+                  <tr><td class="param-name">date_to</td><td>—</td><td></td></tr>
+                  <tr><td class="param-name">year</td><td class="param-optional">ปีปัจจุบัน</td><td></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="body-section">
+              <h4>Response</h4>
+              <span class="res-tag res-200">200 OK</span>
+              <pre>[{
+  <span class="json-key">"label"</span>: <span class="json-str">"ค่าน้ำค่าไฟ"</span>,
+  <span class="json-key">"value"</span>: <span class="json-num">15000.00</span>,
+  <span class="json-key">"category_group"</span>: <span class="json-num">2</span>
+}]</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/report/by-department</span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">รายงานแยกตามฝ่าย</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <p style="color:var(--muted);font-size:12px;margin-bottom:8px">Query parameters เดียวกับ /report/category</p>
+          <div class="body-section">
+            <span class="res-tag res-200">200 OK</span>
+            <pre>[{ <span class="json-key">"department_name"</span>: <span class="json-str">"ฝ่ายการเงิน"</span>, <span class="json-key">"income"</span>: <span class="json-num">50000.00</span>, <span class="json-key">"outcome"</span>: <span class="json-num">30000.00</span> }]</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/report/category-monthly</span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">หมวดหมู่รายเดือน</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-grid">
+            <div class="body-section">
+              <h4>Query Parameters</h4>
+              <table class="param-table">
+                <thead><tr><th>Param</th><th>Default</th></tr></thead>
+                <tbody>
+                  <tr><td class="param-name">year</td><td class="param-optional">ปีปัจจุบัน</td></tr>
+                  <tr><td class="param-name">month</td><td class="param-optional">เดือนปัจจุบัน</td></tr>
+                  <tr><td class="param-name">church_id</td><td>—</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="body-section">
+              <span class="res-tag res-200">200 OK</span>
+              <pre>[{ <span class="json-key">"label"</span>: <span class="json-str">"รายรับ"</span>, <span class="json-key">"value"</span>: <span class="json-num">20000.00</span>, <span class="json-key">"category_group"</span>: <span class="json-num">9</span> }]</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/report/category-monthly-detail</span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">รายละเอียดหมวดหมู่รายเดือน</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <p style="color:var(--muted);font-size:12px;margin-bottom:8px">Query: year, month, church_id</p>
+          <div class="body-section">
+            <span class="res-tag res-200">200 OK</span>
+            <pre>[{
+  <span class="json-key">"transaction_type"</span>: <span class="json-str">"รายรับ"</span>, <span class="json-key">"cat_name"</span>: <span class="json-str">"..."</span>,
+  <span class="json-key">"bank_account"</span>: <span class="json-str">"..."</span>, <span class="json-key">"channel_name"</span>: <span class="json-str">"..."</span>, <span class="json-key">"value"</span>: <span class="json-num">5000.00</span>
+}]</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/report/yearly</span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">สรุปรายรับ-จ่าย รายปี</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <p style="color:var(--muted);font-size:12px;margin-bottom:8px">Query: year (default: ปีปัจจุบัน), church_id</p>
+          <div class="body-section">
+            <span class="res-tag res-200">200 OK</span>
+            <pre>[{ <span class="json-key">"name"</span>: <span class="json-str">"January"</span>, <span class="json-key">"income"</span>: <span class="json-num">100000.00</span>, <span class="json-key">"outcome"</span>: <span class="json-num">80000.00</span>, <span class="json-key">"month_num"</span>: <span class="json-num">1</span> }]</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/report/monthly</span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">สรุปรายรับ-จ่าย รายเดือน</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <p style="color:var(--muted);font-size:12px;margin-bottom:8px">Query: year, month, church_id — Response format เดียวกับ /report/yearly</p>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/report/bank-balance</span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">ยอดคงเหลือบัญชีธนาคาร</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <p style="color:var(--muted);font-size:12px;margin-bottom:8px">Query: church_id, date_from, date_to, year</p>
+          <div class="body-section">
+            <span class="res-tag res-200">200 OK</span>
+            <pre>[{ <span class="json-key">"bank_account"</span>: <span class="json-str">"123-4-56789-0"</span>, <span class="json-key">"balance"</span>: <span class="json-num">250000.00</span> }]</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/report/bank-balance-monthly</span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">ยอดเคลื่อนไหวธนาคารรายเดือน</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <p style="color:var(--muted);font-size:12px;margin-bottom:8px">Query: year, month, church_id — Response เหมือน /report/bank-balance</p>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/report/export-excel</span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">Export Excel รายปี</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <p style="color:var(--muted);font-size:12px;margin-bottom:8px">Query: year (default: ปีปัจจุบัน), church_id</p>
+          <div class="body-section">
+            <span class="res-tag res-file">File</span>
+            <pre>Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+Content-Disposition: attachment; filename="report-{year}.xlsx"</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/report/export-excel-monthly</span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">Export Excel รายเดือน/รายปี</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <p style="color:var(--muted);font-size:12px;margin-bottom:8px">Query: year, month (ถ้าไม่ส่ง = ทั้งปี), church_id</p>
+          <div class="body-section">
+            <span class="res-tag res-file">File</span>
+            <pre>filename: "report-{year}-month-{mm}.xlsx" หรือ "report-{year}.xlsx"</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/report/export-excel-trn</span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">Export Excel ตามช่วงวันที่</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-grid">
+            <div class="body-section">
+              <h4>Query Parameters</h4>
+              <table class="param-table">
+                <thead><tr><th>Param</th><th>Default</th></tr></thead>
+                <tbody>
+                  <tr><td class="param-name">date_from</td><td class="param-optional">วันแรกของปี</td></tr>
+                  <tr><td class="param-name">date_to</td><td class="param-optional">วันสุดท้ายของปี</td></tr>
+                  <tr><td class="param-name">church_ids[]</td><td>—</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="body-section">
+              <h4>Response</h4>
+              <span class="res-tag res-file">File</span>
+              <pre>มีคอลัมน์เพิ่ม: พันธกิจ, หน่วยงาน/ฝ่าย
+filename: "report-from-{from}-to-{to}.xlsx"</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/report/person</span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">รายงานภาพรวมรายบุคคล</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-grid">
+            <div class="body-section">
+              <h4>Query Parameters</h4>
+              <table class="param-table">
+                <thead><tr><th>Param</th><th>Required</th></tr></thead>
+                <tbody>
+                  <tr><td class="param-name">church_id</td><td class="param-required">✅</td></tr>
+                  <tr><td class="param-name">date_from</td><td class="param-optional">—</td></tr>
+                  <tr><td class="param-name">date_to</td><td class="param-optional">—</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="body-section">
+              <span class="res-tag res-200">200 OK</span>
+              <pre>[{
+  <span class="json-key">"user_id"</span>: <span class="json-num">1</span>, <span class="json-key">"firstname"</span>: <span class="json-str">"สมชาย"</span>,
+  <span class="json-key">"transfer_in"</span>: <span class="json-num">5000.00</span>,
+  <span class="json-key">"expense"</span>: <span class="json-num">3000.00</span>,
+  <span class="json-key">"transfer_out"</span>: <span class="json-num">2000.00</span>
+}]</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/report/person-detail</span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">รายละเอียดธุรกรรมรายบุคคล</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-grid">
+            <div class="body-section">
+              <h4>Query Parameters</h4>
+              <table class="param-table">
+                <thead><tr><th>Param</th><th>Required</th></tr></thead>
+                <tbody>
+                  <tr><td class="param-name">userId</td><td class="param-required">✅</td></tr>
+                  <tr><td class="param-name">date_from</td><td class="param-optional">—</td></tr>
+                  <tr><td class="param-name">date_to</td><td class="param-optional">—</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="body-section">
+              <span class="res-tag res-200">200 OK</span>
+              <pre>[{
+  <span class="json-key">"transaction_date"</span>: <span class="json-str">"15-01-2026"</span>,
+  <span class="json-key">"description"</span>: <span class="json-str">"..."</span>,
+  <span class="json-key">"amount"</span>: <span class="json-str">"1000.00"</span>,
+  <span class="json-key">"category_name"</span>: <span class="json-str">"..."</span>,
+  <span class="json-key">"type"</span>: <span class="json-str">"expense"</span>
+}]</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MONTHLY CLOSING -->
+    <section class="section" id="closing">
+      <div class="section-header">
+        <div class="section-icon" style="background:rgba(251,146,60,.15)">📅</div>
+        <div>
+          <h2>Monthly Closing</h2>
+          <div class="section-file">app/report.php — 🔒 JWT Required</div>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/report/monthly-closing-balance</span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">ยอดยกมาจากเดือนก่อนหน้า</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <p style="color:var(--muted);font-size:12px;margin-bottom:8px">Query: church_id, year, month</p>
+          <div class="body-section">
+            <span class="res-tag res-200">200 OK</span>
+            <pre>[{ <span class="json-key">"bank_account"</span>: <span class="json-str">"123-4-56789-0"</span>, <span class="json-key">"statement_balance"</span>: <span class="json-num">100000.00</span> }]</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/report/monthly-closings-yearly</span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">ภาพรวมปิดงบ 12 เดือน</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-grid">
+            <div class="body-section">
+              <h4>Query Parameters</h4>
+              <table class="param-table">
+                <thead><tr><th>Param</th><th>Required</th></tr></thead>
+                <tbody>
+                  <tr><td class="param-name">year</td><td class="param-required">✅</td></tr>
+                  <tr><td class="param-name">church_id</td><td class="param-required">✅</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="body-section">
+              <span class="res-tag res-200">200 OK</span>
+              <pre>{
+  <span class="json-key">"status"</span>: <span class="json-str">"success"</span>,
+  <span class="json-key">"data"</span>: [{
+    <span class="json-key">"month_num"</span>: <span class="json-num">1</span>,
+    <span class="json-key">"status"</span>: <span class="json-str">"approved"</span>,
+    <span class="json-comment">// none | pending | approved | rejected</span>
+    <span class="json-key">"total_income"</span>: <span class="json-num">100000.00</span>,
+    <span class="json-key">"total_expense"</span>: <span class="json-num">80000.00</span>,
+    <span class="json-key">"book_balance"</span>: <span class="json-num">20000.00</span>
+  }]
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/report/monthly-closing-init</span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">ข้อมูลตั้งต้นฟอร์มปิดงบ</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-grid">
+            <div class="body-section">
+              <h4>Query Parameters</h4>
+              <table class="param-table">
+                <thead><tr><th>Param</th><th>Description</th></tr></thead>
+                <tbody>
+                  <tr><td class="param-name">closing_id</td><td class="param-desc">ถ้าส่งมา override year/month/church_id</td></tr>
+                  <tr><td class="param-name">year</td><td></td></tr>
+                  <tr><td class="param-name">month</td><td></td></tr>
+                  <tr><td class="param-name">church_id</td><td></td></tr>
+                  <tr><td class="param-name">status</td><td class="param-desc">none/pending/approved/rejected</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="body-section">
+              <span class="res-tag res-200">200 OK</span>
+              <pre>{
+  <span class="json-key">"status"</span>: <span class="json-str">"success"</span>,
+  <span class="json-key">"data"</span>: {
+    <span class="json-key">"summary"</span>: { <span class="json-key">"church_name"</span>: <span class="json-str">"..."</span>,
+      <span class="json-key">"total_income"</span>: <span class="json-num">0.0</span>, <span class="json-key">"total_expense"</span>: <span class="json-num">0.0</span>,
+      <span class="json-key">"book_balance"</span>: <span class="json-num">0.0</span>, <span class="json-key">"carry_forward"</span>: <span class="json-num">0.0</span> },
+    <span class="json-key">"accounts"</span>: [{ <span class="json-key">"bank_account"</span>: <span class="json-str">"..."</span>,
+      <span class="json-key">"balance"</span>: <span class="json-num">0.0</span>, <span class="json-key">"statement_balance"</span>: <span class="json-num">0.0</span>,
+      <span class="json-key">"diff_balance"</span>: <span class="json-num">0.0</span>, <span class="json-key">"note"</span>: <span class="json-str">""</span> }],
+    <span class="json-key">"attachments"</span>: [],
+    <span class="json-key">"allowedUser"</span>: [{ <span class="json-key">"approve_level"</span>: <span class="json-num">2</span>,
+      <span class="json-key">"user_id"</span>: <span class="json-num">3</span>, <span class="json-key">"firstname"</span>: <span class="json-str">"..."</span>, <span class="json-key">"email"</span>: <span class="json-str">"..."</span> }],
+    <span class="json-key">"audit_logs"</span>: [{ <span class="json-key">"action_status"</span>: <span class="json-str">"pending"</span>,
+      <span class="json-key">"note"</span>: <span class="json-str">"..."</span>, <span class="json-key">"actor_name"</span>: <span class="json-str">"..."</span> }]
+  }
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- POST /api/monthly-closing/submit -->
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method POST">POST</span>
+          <span class="path">/api/monthly-closing/submit</span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">บันทึกปิดงบประจำเดือน</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <p style="color:var(--muted);font-size:12px;margin-bottom:12px">Content-Type: <code style="font-family:var(--mono);color:#93c5fd">multipart/form-data</code></p>
+          <div class="body-grid">
+            <div class="body-section">
+              <h4>Request Body</h4>
+              <table class="param-table">
+                <thead><tr><th>Field</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody>
+                  <tr><td class="param-name">year</td><td class="param-required">✅</td><td></td></tr>
+                  <tr><td class="param-name">month</td><td class="param-required">✅</td><td></td></tr>
+                  <tr><td class="param-name">church_id</td><td class="param-required">✅</td><td></td></tr>
+                  <tr><td class="param-name">accounts_data</td><td class="param-required">✅</td><td class="param-desc">JSON string ของ array บัญชี</td></tr>
+                  <tr><td class="param-name">note_by_treasurer</td><td class="param-optional">—</td><td></td></tr>
+                  <tr><td class="param-name">delete_files</td><td class="param-optional">—</td><td class="param-desc">JSON array ของ attachment ID</td></tr>
+                  <tr><td class="param-name">attachments[]</td><td class="param-optional">—</td><td class="param-desc">ไฟล์แนบใหม่</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="body-section">
+              <h4>accounts_data format</h4>
+              <pre>[{
+  <span class="json-key">"bank_account"</span>: <span class="json-str">"123-4-56789-0"</span>,
+  <span class="json-key">"system_balance"</span>: <span class="json-num">100000.00</span>,
+  <span class="json-key">"statement_balance"</span>: <span class="json-num">99800.00</span>,
+  <span class="json-key">"diff_balance"</span>: <span class="json-num">200.00</span>,
+  <span class="json-key">"note"</span>: <span class="json-str">"ค่าธรรมเนียม..."</span>
+}]</pre>
+              <span class="res-tag res-200">200 OK</span>
+              <pre>{ <span class="json-key">"status"</span>: <span class="json-str">"success"</span>, <span class="json-key">"message"</span>: <span class="json-str">"บันทึกสำเร็จ"</span> }</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- POST /api/monthly-closing-approve-action -->
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method POST">POST</span>
+          <span class="path">/api/monthly-closing-approve-action</span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">Approve / Reject งบปิดงบ</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <div class="body-grid">
+            <div class="body-section">
+              <h4>Request Body (application/json)</h4>
+              <pre>{
+  <span class="json-key">"year"</span>: <span class="json-num">2026</span>,
+  <span class="json-key">"month"</span>: <span class="json-num">1</span>,
+  <span class="json-key">"church_id"</span>: <span class="json-num">1</span>,
+  <span class="json-key">"status"</span>: <span class="json-str">"approved"</span>,
+  <span class="json-comment">// "approved" | "rejected"</span>
+  <span class="json-key">"note_by_approver"</span>: <span class="json-str">"ตรวจสอบแล้ว ถูกต้อง"</span>,
+  <span class="json-key">"user_level"</span>: <span class="json-num">2</span>
+}</pre>
+            </div>
+            <div class="body-section">
+              <h4>Response</h4>
+              <span class="res-tag res-200">200 OK</span>
+              <pre>{ <span class="json-key">"status"</span>: <span class="json-str">"success"</span>, <span class="json-key">"message"</span>: <span class="json-str">"อนุมัติปิดรอบบัญชี..."</span> }</pre>
+              <span class="res-tag res-400">400</span>
+              <pre><span class="json-comment">// งบที่ approved แล้วไม่สามารถแก้ไขได้</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GET /api/report/my-pending-approvals -->
+      <div class="endpoint">
+        <div class="endpoint-header" onclick="toggle(this)">
+          <span class="method GET">GET</span>
+          <span class="path">/api/report/my-pending-approvals</span>
+          <span class="auth-badge jwt">🔒 JWT</span>
+          <span class="endpoint-desc">รายการรออนุมัติของฉัน</span>
+          <span class="chevron">▶</span>
+        </div>
+        <div class="endpoint-body">
+          <p style="color:var(--muted);font-size:12px;margin-bottom:8px">ดึง userId จาก JWT Token — ไม่ต้องส่ง query parameters</p>
+          <div class="body-section">
+            <span class="res-tag res-200">200 OK</span>
+            <pre>[{
+  <span class="json-key">"closing_id"</span>: <span class="json-num">10</span>, <span class="json-key">"closing_status"</span>: <span class="json-str">"pending"</span>,
+  <span class="json-key">"year"</span>: <span class="json-num">2026</span>, <span class="json-key">"month"</span>: <span class="json-num">1</span>,
+  <span class="json-key">"church_id"</span>: <span class="json-num">1</span>, <span class="json-key">"church_name"</span>: <span class="json-str">"โบสถ์ A"</span>,
+  <span class="json-key">"my_approve_level"</span>: <span class="json-num">2</span>,
+  <span class="json-key">"firstname"</span>: <span class="json-str">"สมชาย"</span>, <span class="json-key">"email"</span>: <span class="json-str">"..."</span>
+}]</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ERROR FORMAT -->
+    <section class="section" id="errors">
+      <div class="section-header">
+        <div class="section-icon" style="background:rgba(239,68,68,.15)">⚠️</div>
+        <div>
+          <h2>Error Response Format</h2>
+        </div>
+      </div>
+
+      <table class="summary-table">
+        <thead><tr><th>HTTP Status</th><th>ความหมาย</th><th>ตัวอย่าง</th></tr></thead>
+        <tbody>
+          <tr><td><span class="res-tag res-400">400</span></td><td>ข้อมูลไม่ครบหรือไม่ถูกต้อง</td><td class="mono">{ "status": "error", "message": "โปรดระบุ..." }</td></tr>
+          <tr><td><span class="res-tag res-401">401</span></td><td>Token หมดอายุหรือไม่ถูกต้อง</td><td class="mono">{ "error": "Unauthorized" }</td></tr>
+          <tr><td><span class="res-tag res-404">404</span></td><td>ไม่พบข้อมูล</td><td class="mono">{ "status": "error", "message": "ไม่พบข้อมูล" }</td></tr>
+          <tr><td><span class="res-tag res-500">500</span></td><td>เกิดข้อผิดพลาดภายใน Server</td><td class="mono">{ "status": "error", "message": "..." }</td></tr>
+        </tbody>
+      </table>
+
+      <pre>{
+  <span class="json-key">"status"</span>: <span class="json-str">"error"</span>,
+  <span class="json-key">"message"</span>: <span class="json-str">"รายละเอียดข้อผิดพลาด"</span>
+}</pre>
+    </section>
+
+  </main>
+</div>
+
+<script>
+  function toggle(header) {
+    const card = header.closest('.endpoint');
+    card.classList.toggle('open');
+  }
+
+  // Highlight active nav on scroll
+  const sections = document.querySelectorAll('.section');
+  const navLinks = document.querySelectorAll('.nav-link');
+
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(l => l.classList.remove('active'));
+        const link = document.querySelector(`.nav-link[href="#${entry.target.id}"]`);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-30% 0px -60% 0px' });
+
+  sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>

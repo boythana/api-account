@@ -451,7 +451,8 @@ return function (App $app) {
             WHERE t.bank_account IS NOT NULL 
               AND t.bank_account != ''
               AND t.transaction_date >= :start_date
-              AND t.transaction_date < :end_date"; // 👈 จำกัดพื้นที่เฉพาะเดือนที่เลือก
+              AND t.transaction_date < :end_date
+              AND ac.id NOT IN (42) "; 
 
             // เตรียม Parameter ให้ครบทั้งจุดเริ่มต้นและสิ้นสุด
             $params = [
@@ -1145,6 +1146,7 @@ return function (App $app) {
                             WHERE YEAR(t.transaction_date) = :year 
                             AND MONTH(t.transaction_date) = :month 
                             AND t.church_id = :church_id
+                            AND ac.id NOT IN (42)
                         ");
                     $stmtSummary->execute([':year' => $year, ':month' => $month, ':church_id' => $churchId]);
                     $summaryData = $stmtSummary->fetch(PDO::FETCH_ASSOC);
@@ -1164,7 +1166,10 @@ return function (App $app) {
                                 SUM(CASE WHEN ac.`group` = 9 THEN t.amount ELSE -t.amount END) as month_movement
                             FROM transactions t
                             LEFT JOIN account_categories ac ON t.category_id = ac.id
-                            WHERE t.church_id = :church_id AND YEAR(t.transaction_date) = :year AND MONTH(t.transaction_date) = :month
+                            WHERE t.church_id = :church_id 
+                            AND YEAR(t.transaction_date) = :year 
+                            AND MONTH(t.transaction_date) = :month
+                            AND ac.id NOT IN (42)
                             GROUP BY t.bank_account
                         ");
                     $stmtCurrentMonthMove->execute([':church_id' => $churchId, ':year' => $year, ':month' => $month]);
