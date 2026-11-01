@@ -26,7 +26,7 @@
         "ext-json": "*",
         "firebase/php-jwt": "^7.0",
         "monolog/monolog": "^2.8",
-        "php-di/php-di": "^6.4",
+        "php-di/php-di": "^7.1",
         "phpmailer/phpmailer": "^7.1",
         "phpoffice/phpspreadsheet": "^5.5",
         "slim/psr7": "^1.5",
